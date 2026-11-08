@@ -1,0 +1,60 @@
+name: Xandao Voice Studio - ElevenLabs MP3
+
+on:
+  workflow_dispatch:
+    inputs:
+      texto:
+        description: "Texto publico para locucao (max. 500 caracteres)"
+        required: true
+        type: string
+        default: "Você sabe o que é microfonia? É quando o som da caixa volta ao microfone, criando uma realimentação que produz aquele apito. Para evitar, posicione as caixas corretamente e controle o ganho."
+      voice_id:
+        description: "ID da voz na ElevenLabs (padrao: voz de exemplo; podemos trocar por uma brasileira)"
+        required: true
+        type: string
+        default: "JBFqnCBsd6RMkjVDRZzb"
+
+permissions:
+  contents: read
+
+jobs:
+  narrar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Gerar MP3 usando API ElevenLabs
+        env:
+          ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
+          TEXTO: ${{ inputs.texto }}
+          VOICE_ID: ${{ inputs.voice_id }}
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const key = process.env.ELEVENLABS_API_KEY || '';
+          const text = (process.env.TEXTO || '').trim();
+          const voiceId = (process.env.VOICE_ID || '').trim();
+          if (!key) throw new Error('Configure ELEVENLABS_API_KEY nos segredos do repositorio.');
+          if (text.length < 1 || text.length > 500) throw new Error('O texto deve ter de 1 a 500 caracteres.');
+          if (!/^[a-zA-Z0-9]{20,40}$/.test(voiceId)) throw new Error('ID de voz invalido.');
+          (async () => {
+            const response = await fetch('https://api.elevenlabs.io/v1/text-to-speech/' + voiceId, {
+              method: 'POST',
+              headers: {'xi-api-key': key, 'Content-Type': 'application/json', Accept:'audio/mpeg'},
+              body: JSON.stringify({text, model_id:'eleven_multilingual_v2', output_format:'mp3_44100_128'})
+            });
+            if (!response.ok) {
+              const error = await response.text();
+              throw new Error('ElevenLabs HTTP ' + response.status + ': ' + error.slice(0,450));
+            }
+            fs.writeFileSync('xandao-locucao-elevenlabs.mp3', Buffer.from(await response.arrayBuffer()));
+            console.log('MP3 gerado com sucesso.');
+          })().catch(e => { console.error(e.message); process.exitCode = 1; });
+          NODE
+
+      - name: Disponibilizar locucao para download
+        uses: actions/upload-artifact@v4
+        with:
+          name: xandao-locucao-elevenlabs-mp3
+          path: xandao-locucao-elevenlabs.mp3
+          retention-days: 3
+          if-no-files-found: error
