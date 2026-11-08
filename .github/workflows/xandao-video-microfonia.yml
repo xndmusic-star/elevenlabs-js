@@ -9,6 +9,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 jobs:
   gerar-video:
@@ -31,9 +32,15 @@ jobs:
           python -m pip install "Pillow>=10,<13"
           ffmpeg -version | head -n 1
           ffprobe -version | head -n 1
-      - name: Produzir video narrado
-        env:
-          ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
+      - name: Recuperar MP3 original aprovado na primeira execução
+        uses: actions/download-artifact@v4
+        with:
+          name: xandao-locucao-elevenlabs-mp3
+          run-id: 42532585777
+          repository: xndmusic-star/elevenlabs-js
+          github-token: ${{ github.token }}
+          path: xandao-video/voice
+      - name: Produzir video com MP3 aprovado
         run: python xandao-video/microfonia.py
       - name: Arquivo MP4 final
         uses: actions/upload-artifact@v4
