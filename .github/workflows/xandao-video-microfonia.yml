@@ -1,0 +1,41 @@
+name: Xandao Video Microfonia ElevenLabs
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/xandao-video-microfonia.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  gerar-video:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Obter composicao visual OpenMontage
+        uses: actions/checkout@v4
+        with:
+          repository: xndmusic-star/openmontage
+          ref: main
+      - name: Preparar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Instalar Pillow e verificar FFmpeg
+        run: |
+          python -m pip install "Pillow>=10,<13"
+          ffmpeg -version | head -n 1
+      - name: Produzir video narrado
+        env:
+          ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
+        run: python xandao-video/microfonia.py
+      - name: Arquivo MP4 final
+        uses: actions/upload-artifact@v4
+        with:
+          name: Xandao-Microfonia-ElevenLabs-MP4
+          path: video-final/Xandao-Microfonia-ElevenLabs.mp4
+          if-no-files-found: error
+          retention-days: 7
